@@ -16,6 +16,10 @@ class ChatView extends Component {
         }
     }
 
+    componentWillMount(){
+        Strophe.addConnectionPlugin()
+    }
+
 
     setMessageContent = (event) => {
         this.setState({
@@ -52,46 +56,16 @@ class ChatView extends Component {
             messageList: rows
         });
     }
-    
+
     render() {
         return <div>
-            <div>
-                Send messages to your clients from here
-               <br />  <br />
-                Client Jid : <input type="text" value={this.state.toJid} onChange={this.setToJid} />
-
-                <br />  <br />
-
-                Message : <textarea value={this.state.messageContent} onChange={this.setMessageContent} />
-
+                <div> Hello,W   elcome to Strophe Web Client  </div>
+                <br />
+                Jid  <input type="text"  value={this.state.jid} onChange={this.setJid} /> &nbsp;
+        Password  <input type="password" value={this.state.password} onChange={this.setPassword} />
                 <br /> <br />
-                <input type="button" value="Send Message" onClick={this.sendMessage} />
-
-            </div>
-            <br /> <br />
-            <div className="message-list">
-
-                <table id="messages-table">
-                    <thead>
-                        <tr>
-                            <th> Message  </th>
-                            <th>  Sent By  </th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        {this.state.messageList.map((message) => (
-                            <tr key={message.body}>
-                                <td> {message.body} </td>
-                                <td> {message.sentBy}  </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-
-            </div>
-
-        </div>;
+                <input type="button" value="Log In" onClick={this.connect} />
+            </div>;
     }
 
 }
