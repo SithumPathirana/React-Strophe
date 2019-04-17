@@ -6,9 +6,6 @@ import { $msg } from 'strophe.js';
 
 class Login extends Component {
 
-    componentWillMount(){
-    }
-
     constructor(props) {
         super(props)
         this.state = {
@@ -19,14 +16,14 @@ class Login extends Component {
             messageContent: "",
             toJid: "",
             messageList: [],
-            fileSelected:'',
-            sid:null,
-            chucksize:null,
-            data:null,
-            file:null,
-            aFileParts:null,
-            mimeFile:null,
-            fileName:null
+            fileSelected: '',
+            sid: null,
+            chucksize: null,
+            data: null,
+            file: null,
+            aFileParts: null,
+            mimeFile: null,
+            fileName: null
 
 
         }
@@ -81,22 +78,13 @@ class Login extends Component {
             var body = elems[0];
             console.log('Strophe Test: I got a message from ' + from + ': ' +
                 Strophe.getText(body));
-                console.log("Message type is : "+type)
-                this.updateTable(from,Strophe.getText(body))
+            console.log("Message type is : " + type)
+            this.updateTable(from, Strophe.getText(body))
         }
         return true;
     }
 
-    fileHandler=(from, sid, filename, size, mime)=> {
-        // received a stream initiation
-        // save to data and be prepared to receive the file.
-       console.log("fileHandler: from=" + from + ", file=" + filename + ", size=" + size + ", mime=" + mime);
-       this.setState({
-           mimeFile:mime,
-           filename:filename
-       });
-        return true;
-      }
+
 
     sendMessage = () => {
         var connection = this.state.connection
@@ -123,50 +111,184 @@ class Login extends Component {
                 console.log("Strophe is not connected")
             }
         })
-        //connection.addHandler(this.onMessage, null, 'message', null, null, null)
+        connection.addHandler(this.onMessage, null, 'message', null, null, null);
         connection.si_filetransfer.addFileHandler(this.fileHandler);
+        connection.ibb.addIBBHandler(this.ibbHandler);
         this.setState({
             connectedSuccessfully: true
         });
 
     }
 
-    handleFileSelect=(evt)=> {
+
+    /* Receive and handle incomming file requests  */
+    fileHandler = (from, sid, filename, size, mime) => {
+        // received a stream initiation
+        // save to data and be prepared to receive the file.
+        console.log("fileHandler: from=" + from + ", file=" + filename + ", size=" + size + ", mime=" + mime);
+        this.setState({
+            mimeFile: mime,
+            filename: filename
+        });
+        return true;
+    }
+
+    /* Handle byte streams */
+    ibbHandler = (type, from, sid, data, seq) => {
+        console.log("ibbHandler: type=" + type + ", from=" + from);
+
+        switch (type) {
+            case "open":
+                // New file,only metadata
+                this.setState({
+                    aFileParts: []
+                });
+                break;
+
+            case "data": console.log("	>seq=" + seq);
+                console.log("	>data=" + data);
+                var fileParts = this.state.aFileParts;
+                fileParts.push(data)
+                this.setState({
+                    aFileParts: fileParts
+                });
+                // data
+                break;
+
+            case "close":
+                var data = "data:" + this.state.mimeFile + ";base64,";
+                var fileParts = this.state.aFileParts;
+                for (var i = 0; i < fileParts.length; i++) {
+                    data += fileParts[i].split(",")[1];
+                }
+                console.log("	>data=" + data);
+                console.log("	>data.len=" + data.length);
+
+                // Create a download link here 
+
+                break;
+
+            default: throw new Error("Should not be here");
+        }
+        return true;
+    }
+
+    /* Handle file select input */
+    handleFileSelect = (evt) => {
         var files = evt.target.files; // FileList object
         this.setState({
-            file:files[0]
+            file: files[0]
         });
     }
 
-    handleSendFileClick=()=>{
+
+    /* Handle Send File Button */
+    handleSendFileClick = () => {
         console.log("Send file called")
         this.sendFile(this.state.file)
 
-    }
-
-    sendFile=(file)=>{
-        var connection=this.state.connection;
-        var to=this.state.toJid;
-        var fileName=file.name;
-        var fileSize=file.size;
-        var mime=file.type;
-        var chucksize=20*1024;
-        this.setState({
-            chucksize:fileSize,
-            sid:connection._proto.sid
+        this.readAll(this.state.file, function (data) {
+            console.log("handleFileSelect:");
+            console.log("	>data=" + data);
+            console.log("	>data.len=" + data.length);
         });
-       connection.si_filetransfer.send(to,this.state.sid,fileName,fileSize,mime,function(error){
-        if (error) {
-            return console.log(error);
-          }
-         connection.ibb.open()
 
-       });
-
-        console.log("File to be sent is to "+to+" fileName "+fileName+" filesize "+fileSize+" mime "+mime)
     }
 
-   
+    /* Send the file to a client */
+    sendFile = (file) => {
+        var connection = this.state.connection;
+        var to = this.state.toJid;
+        var fileName = file.name;
+        var fileSize = file.size;
+        var mime = file.type;
+        var chucksize = fileSize;
+        var sid = connection._proto.sid;
+
+        console.log("File to be sent is to " + to + " fileName " + fileName + " filesize " + fileSize + " mime " + mime);
+
+        connection.si_filetransfer.send(to, sid, fileName, fileSize, mime, (error) => {
+            console.log("fileTransferHandler: err=" + error);
+            if (error) {
+                return console.log(error);
+            }
+            chucksize = 20 * 1024;
+            connection.ibb.open(to, sid, chucksize, (error) => {
+                console.log("ibb.open: err=" + error);
+                if (error) {
+                    return console.log(error);
+                }
+                this.readChuncks(file, (data, seq) => {
+                    this.sendData(to, seq, data);
+                });
+            });
+
+        });
+
+
+    }
+
+    /* Read file data */
+    readAll = (file, cb) => {
+        var reader = new FileReader();
+
+        reader.onloadend = function (evt) {
+            if (evt.target.readyState == FileReader.DONE) { // DONE == 2
+                cb(evt.target.result);
+            }
+        };
+
+        reader.readAsDataURL(file)
+    }
+
+    /*   */
+    readChuncks = (file, callback) => {
+        console.log("Reading the chuncks");
+
+        var fileSize = file.size;
+        var chunkSize = 20 * 1024; // bytes
+        var offset = 0;
+        var block = null;
+        var seq = 0;
+
+        var foo = function (evt) {
+            if (evt.target.error === null) {
+                offset += chunkSize;  //evt.target.result.length;
+                seq++;
+                callback(evt.target.result, seq); // callback for handling read chunk
+
+            } else {
+                console.log("Read Error : " + evt.target.error);
+                return;
+            }
+
+            if (offset >= fileSize) {
+                console.log("Done Reading File");
+                return;
+            }
+            block(offset, chunkSize, file)
+        }
+
+        block = function (_offset, length, _file) {
+            console.log("_block: length=" + length + ", _offset=" + _offset);
+            var r = new FileReader();
+            var blob = _file.slice(_offset, length + _offset);
+            r.onload = foo;
+            r.readAsDataURL(blob);
+        }
+
+        block(offset, chunkSize, file);
+    }
+
+    sendData = (to, seq, data) => {
+        // stream is open, start sending chunks of data
+        console.log("Stream is open to send data");
+
+    }
+
+
+
+
     render() {
         if (this.state.connectedSuccessfully) {
             return <div>
@@ -178,13 +300,13 @@ class Login extends Component {
                     <br />  <br />
 
                     Message : <textarea value={this.state.messageContent} onChange={this.setMessageContent} />
-                  
+
                     <br /> <br />
                     <input type="button" value="Send Message" onClick={this.sendMessage} />
                     &nbsp;
-                    <input type="file" id="file" name="file[]"  onChange={this.handleFileSelect}/>
-                    <br/> <br/>
-                    <input type="button"  onClick={this.handleSendFileClick} value="Send File" />
+                    <input type="file" id="file" name="file[]" onChange={this.handleFileSelect} />
+                    <br /> <br />
+                    <input type="button" onClick={this.handleSendFileClick} value="Send File" />
                 </div>
                 <br /> <br />
                 <div className="message-list">
@@ -199,7 +321,7 @@ class Login extends Component {
 
                         <tbody>
                             {this.state.messageList.map((message) => (
-                                <tr key={message.sentBy+message.body}>
+                                <tr key={message.sentBy + message.body}>
                                     <td> {message.body} </td>
                                     <td> {message.sentBy}  </td>
                                 </tr>

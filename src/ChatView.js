@@ -59,7 +59,7 @@ class ChatView extends Component {
 
     render() {
         return <div>
-                <div> Hello,W   elcome to Strophe Web Client  </div>
+                <div> Hello,Welcome to Strophe Web Client  </div>
                 <br />
                 Jid  <input type="text"  value={this.state.jid} onChange={this.setJid} /> &nbsp;
         Password  <input type="password" value={this.state.password} onChange={this.setPassword} />

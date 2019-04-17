@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import { Strophe } from 'strophe.js'
 import Loign from './Login'
 import {si_prototype} from './resources/fileprototype'
+import {ibb_prototype} from './resources/ibbprototype'
 
 class App extends Component {
 
@@ -14,7 +15,8 @@ class App extends Component {
   }
 
     componentWillMount(){
-      Strophe.addConnectionPlugin("si_filetransfer",si_prototype)
+      Strophe.addConnectionPlugin('ibb',ibb_prototype);
+      Strophe.addConnectionPlugin('si_filetransfer',si_prototype);
       this.setState({
         connection:new window.Strophe.Connection("https://wellness.hsenidmobile.com/http-bind/")
       });
