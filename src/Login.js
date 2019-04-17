@@ -283,6 +283,28 @@ class Login extends Component {
     sendData = (to, seq, data) => {
         // stream is open, start sending chunks of data
         console.log("Stream is open to send data");
+        var connection = this.state.connection;
+        var sid = this.state.sid;
+        console.log("The sid is : "-sid);
+        connection.ibb.data(to, sid, seq, data, (error) => {
+            console.log("ibb.data: err=" + error);
+
+            if (error) {
+                return console.log(error);
+            }
+
+            // ... repeat calling data
+            // keep sending until you're ready you've reached the end of the file
+            connection.ibb.close(to, sid, (error) => {
+               console.log("ibb.close: err=" + error);
+                if (error) {
+                    return console.log(error);
+                }
+                // done
+            });
+        });
+
+
 
     }
 
